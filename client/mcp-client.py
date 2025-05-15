@@ -17,6 +17,27 @@ if "messages" not in st.session_state:
 # Streamlit app config
 st.set_page_config(page_title="MCP Demo", page_icon="🛡️", initial_sidebar_state="auto")
 
+def normalize_url(url, transport_type):
+    # Validate that the URL starts with http or https
+    if not url.startswith(("http://", "https://")):
+        st.error("URL must start with http:// or https://")
+        st.stop()
+
+    # Normalize trailing slashes for consistent checks
+    url = url.rstrip("/")
+
+    # Modify URL based on transport type
+    if transport_type == "SSE":
+        if not url.endswith("/sse"):
+            url += "/sse"
+    elif transport_type == "Streamable HTTP":
+        if not (url.endswith("/mcp") or url.endswith("/mcp/")):
+            url += "/mcp/"
+        elif url.endswith("/mcp"):
+            url += "/"
+
+    return url
+
 # App settings
 with st.sidebar:
     st.title("🛡️ MCP Demo")
@@ -37,12 +58,14 @@ with st.sidebar:
                 st.error("Please provide the MCP Server URL.")
             else:
                 try:
-                    async def init_client_and_list_tools():
+                    async def init_client_async():
                         try:
+                            url = normalize_url(server_url, transport_type)
+                            print(url)
                             if transport_type == "SSE":
-                                transport = SSETransport(server_url)
+                                transport = SSETransport(url)
                             elif transport_type == "Streamable HTTP":
-                                transport = StreamableHttpTransport(server_url)
+                                transport = StreamableHttpTransport(url)
                             
                             async with Client(transport) as client:
                                 tools = await client.list_tools()
@@ -51,7 +74,7 @@ with st.sidebar:
                             st.error(f"Error during connection or tool listing: {e}")
                             return None, None
 
-                    client, tools = asyncio.run(init_client_and_list_tools())
+                    client, tools = asyncio.run(init_client_async())
                     
                     if client:
                         st.session_state.client = client
