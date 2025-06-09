@@ -1,0 +1,2 @@
+fastmcp==2.7.1
+google-cloud-webrisk==1.18.0
