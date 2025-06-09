@@ -1,4 +1,4 @@
-import asyncio
+import random, asyncio
 from fastmcp import FastMCP
 
 mcp_server = FastMCP(name="HelloMCPServer")
@@ -8,9 +8,9 @@ def greet(name: str) -> str:
     """Greets a user by name."""
     return f"Hello, {name}!"
 
-@mcp_server.tool
+@mcp_server.tool()
 def roll_dice(n_dice: int) -> list[int]:
-    """Rolls `n_dice` 6-sided dice and returns the results."""
+    """Rolls n_dice 6-sided dice and returns the results."""
     return [random.randint(1, 6) for _ in range(n_dice)]
 
 async def main():
