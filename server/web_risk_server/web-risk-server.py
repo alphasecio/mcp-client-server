@@ -31,15 +31,7 @@ def _get_threat_types() -> List[webrisk_v1.ThreatType]:
 
 @mcp_server.tool()
 def lookup_url(url: str) -> Dict[str, Any]:
-    """
-    Lookup a URL using Google Cloud Web Risk API
-    
-    Args:
-        url: The URL to lookup
-    
-    Returns:
-        Dictionary containing lookup results with 'safe' status and threat details
-    """
+    """Lookup a URL using Google Cloud Web Risk API"""
     logging.info(f"lookup_url() called with url={url}")
 
     if not url.strip():
