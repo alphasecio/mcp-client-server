@@ -182,8 +182,8 @@ if prompt := st.chat_input("Ask anything"):
     with st.chat_message("assistant"):
         ERROR_MSG = "Sorry, I couldn't generate a response. Please try again."
         try:
+            enhanced_prompt = prompt
             if st.session_state.mcp_tools:
-                enhanced_prompt = prompt
                 tool_names = [tool.name for tool in st.session_state.mcp_tools]
                 enhanced_prompt += f"\n\nAvailable tools on the MCP server: {', '.join(tool_names)}."
             
