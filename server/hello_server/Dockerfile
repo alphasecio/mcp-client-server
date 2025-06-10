@@ -1,13 +1,18 @@
-FROM python:3.12-slim
+FROM cgr.dev/chainguard/python:latest-dev as dev
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m venv venv
+ENV PATH="/app/venv/bin":$PATH
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
 
-COPY . /app
+FROM cgr.dev/chainguard/python:latest
 
-USER nobody
-EXPOSE 8000
+WORKDIR /app
+
+COPY hello-server.py hello-server.py
+COPY --from=dev /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 
 ENTRYPOINT ["python", "hello-server.py"]
