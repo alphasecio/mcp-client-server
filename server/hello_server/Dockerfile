@@ -1,6 +1,8 @@
 # Stage 1 - Build
 FROM cgr.dev/chainguard/python:latest-dev as build
 
+USER root
+
 WORKDIR /app
 COPY requirements.txt .
 
@@ -10,6 +12,8 @@ RUN apk add --no-cache uv \
 
 # Stage 2 - Run
 FROM cgr.dev/chainguard/python:latest
+
+USER nonroot
 
 WORKDIR /app
 COPY hello-server.py .
