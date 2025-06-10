@@ -3,7 +3,10 @@ FROM cgr.dev/chainguard/python:latest-dev as build
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --prefix=/python-deps --no-cache-dir -r requirements.txt
+
+# Install uv, then use it to install dependencies into /python-deps
+RUN apk add --no-cache uv \
+ && uv pip install --target=/python-deps --no-cache-dir -r requirements.txt
 
 # Stage 2 - Run
 FROM cgr.dev/chainguard/python:latest
@@ -12,6 +15,6 @@ WORKDIR /app
 COPY hello-server.py .
 COPY --from=build /python-deps /python-deps
 
-ENV PYTHONPATH="/python-deps/lib/python3.11/site-packages"
+ENV PYTHONPATH="/python-deps"
 
 ENTRYPOINT ["python", "hello-server.py"]
