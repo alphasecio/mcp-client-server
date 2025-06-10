@@ -1,35 +1,21 @@
-# Stage 1 - Builder
-FROM python:3.11-slim as builder
+# Stage 1 - Build
+FROM python:3.11-slim as build
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy and install dependencies
+WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Stage 2 - Final
+RUN pip install --prefix=/python-deps --no-cache-dir -r requirements.txt
+
+# Stage 2 - Run
 FROM gcr.io/distroless/python3-debian12
 
-# Set working directory
 WORKDIR /app
+COPY --from=build /python-deps /python-deps
+COPY web-risk-server.py .
 
-# Set environment variables
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/python-deps/lib/python3.11/site-packages"
 
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-
-# Copy application code
-COPY . /app
-
-# Use nonroot user (distroless includes this user)
 USER nonroot
-
-# Expose port
 EXPOSE 8000
 
-# Run the application
 ENTRYPOINT ["python", "web-risk-server.py"]
