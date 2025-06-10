@@ -1,18 +1,17 @@
-FROM cgr.dev/chainguard/python:latest-dev as dev
+# Stage 1 - Build
+FROM cgr.dev/chainguard/python:latest-dev as build
 
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --prefix=/python-deps --no-cache-dir -r requirements.txt
 
-RUN python -m venv venv
-ENV PATH="/app/venv/bin":$PATH
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
-
+# Stage 2 - Run
 FROM cgr.dev/chainguard/python:latest
 
 WORKDIR /app
+COPY hello-server.py .
+COPY --from=build /python-deps /python-deps
 
-COPY hello-server.py hello-server.py
-COPY --from=dev /app/venv /app/venv
-ENV PATH="/app/venv/bin:$PATH"
+ENV PYTHONPATH="/python-deps/lib/python3.11/site-packages"
 
 ENTRYPOINT ["python", "hello-server.py"]
