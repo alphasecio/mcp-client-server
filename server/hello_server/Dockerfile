@@ -3,14 +3,16 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --target /python-deps -r requirements.txt
 
 # Stage 2 - Final
 FROM gcr.io/distroless/python3-debian12
 
-COPY --from=builder /install /usr/local
-COPY . /app
 WORKDIR /app
+ENV PYTHONPATH="/python-deps:/app"
+
+COPY --from=builder /python-deps /python-deps
+COPY . /app
 
 USER nonroot
 EXPOSE 8000
