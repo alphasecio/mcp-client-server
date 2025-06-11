@@ -11,11 +11,11 @@ FROM gcr.io/distroless/python3-debian12
 
 WORKDIR /app
 COPY --from=build /python-deps /python-deps
-COPY web-risk-server.py .
+COPY web_risk_server.py .
 
 ENV PYTHONPATH="/python-deps/lib/python3.11/site-packages"
 
 USER nonroot
 EXPOSE 8000
 
-ENTRYPOINT ["python", "web-risk-server.py"]
+ENTRYPOINT ["python", "web_risk_server.py"]
