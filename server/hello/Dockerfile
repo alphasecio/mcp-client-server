@@ -16,7 +16,7 @@ FROM cgr.dev/chainguard/python:latest
 USER nonroot
 
 WORKDIR /app
-COPY hello-server.py .
+COPY hello_server.py .
 COPY --from=build /python-deps /python-deps
 
 ENV PYTHONPATH="/python-deps"
