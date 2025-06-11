@@ -21,4 +21,4 @@ COPY --from=build /python-deps /python-deps
 
 ENV PYTHONPATH="/python-deps"
 
-ENTRYPOINT ["python", "hello-server.py"]
+ENTRYPOINT ["python", "hello_server.py"]
