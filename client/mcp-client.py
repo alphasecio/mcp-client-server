@@ -172,7 +172,7 @@ with st.sidebar:
     
     # Display available tools once connected
     if st.session_state.mcp_tools:
-        st.write("🛠️ Tools Available")
+        st.subheader("🛠️ Tools Available")
         for tool in st.session_state.mcp_tools:
             with st.expander(f"🔧 {tool.name}", expanded=False):
                 st.write(f"`{tool.description}`")
