@@ -1,4 +1,4 @@
-import os, asyncio, nest_asyncio
+import os, json, asyncio, nest_asyncio
 import streamlit as st
 import google.genai as genai
 
@@ -22,11 +22,18 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Streamlit app configuration
-st.set_page_config(page_title="MCP Demo", page_icon="🛡️", initial_sidebar_state="auto")
+st.set_page_config(page_title="MCP Chatbot", page_icon="💬", initial_sidebar_state="auto")
 
 MODEL = "gemini-2.0-flash"
 
 # Helper functions
+def load_mcp_config():
+    try:
+        return json.loads(os.environ.get("MCP_SERVER_CONFIG", '{"mcpServers":{}}'))
+    except Exception as e:
+        st.warning("Missing or invalid MCP config.")
+        return {"mcpServers": {}}
+
 def normalize_url(url: str, transport_type: str) -> str:
     # Validate that the URL starts with http or https
     if not url.startswith(("http://", "https://")):
@@ -37,10 +44,10 @@ def normalize_url(url: str, transport_type: str) -> str:
     url = url.rstrip("/")
 
     # Modify URL based on transport type
-    if transport_type == "SSE":
+    if transport_type == "sse":
         if not url.endswith("/sse"):
             url += "/sse"
-    elif transport_type == "Streamable HTTP":
+    elif transport_type == "streamable-http":
         if not (url.endswith("/mcp") or url.endswith("/mcp/")):
             url += "/mcp/"
         elif url.endswith("/mcp"):
@@ -48,7 +55,7 @@ def normalize_url(url: str, transport_type: str) -> str:
     return url
 
 def create_transport(config):
-    if config["transport_type"] == "SSE":
+    if config["transport_type"] == "sse":
         return SSETransport(config["url"])
     else:
         return StreamableHttpTransport(config["url"])
@@ -96,7 +103,7 @@ async def generate_response(prompt, mcp_config):
 
 # Sidebar settings
 with st.sidebar:
-    st.title("🛡️ MCP Demo")
+    st.title("💬 MCP Chatbot")
     st.subheader("⚙️ Settings")
     with st.container(border=True):
         if "GOOGLE_API_KEY" not in os.environ:
@@ -112,8 +119,26 @@ with st.sidebar:
                 st.error(f"Failed to initialise Gemini client: {e}")
     
     with st.container(border=True):
-        server_url = st.text_input("MCP Server URL", value=st.session_state.mcp_config["url"] if st.session_state.mcp_config else "").strip()
-        transport_type = st.selectbox("MCP Transport", ("Streamable HTTP", "SSE"), index=0 if not st.session_state.mcp_config else (0 if st.session_state.mcp_config["transport_type"] == "Streamable HTTP" else 1))
+        config = load_mcp_config()
+        server_keys = list(config["mcpServers"].keys()) + ["custom"]
+
+        selected_key = st.selectbox("MCP Server", server_keys)
+
+        if selected_key != "custom":
+            selected_server = config["mcpServers"][selected_key]
+            server_url = st.text_input("MCP Server URL", value=selected_server["url"], disabled=True)
+            transport_type = st.selectbox("MCP Transport", ("streamable-http", "sse"),
+                                        index=0 if selected_server["transport"].lower() == "streamable-http" else 1,
+                                        disabled=True)
+        else:
+            default_url = st.session_state.mcp_config["url"] if st.session_state.mcp_config else ""
+            default_transport = st.session_state.mcp_config["transport_type"] if st.session_state.mcp_config else "streamable-http"
+
+            server_url = st.text_input("MCP Server URL", default_url)
+            transport_type = st.selectbox("MCP Transport", ("streamable-http", "sse"),
+                                        index=0 if default_transport == "streamable-http" else 1)
+        
+        current_config = {"url": server_url.strip(), "transport_type": transport_type}
         
         col1, col2 = st.columns(2)
         with col1:
@@ -131,13 +156,13 @@ with st.sidebar:
                 st.error("Provide MCP Server URL.")
             else:
                 try:
-                    url = normalize_url(server_url, transport_type)
-                    transport = SSETransport(url) if transport_type == "SSE" else StreamableHttpTransport(url)
+                    url = normalize_url(current_config["url"], current_config["transport_type"])
+                    transport = SSETransport(url) if current_config["transport_type"] == "sse" else StreamableHttpTransport(url)
                     tools = asyncio.run(init_client_and_get_tools(transport))
 
                     if tools is not None:
                         st.session_state.mcp_tools = tools
-                        st.session_state.mcp_config = {"url": url, "transport_type": transport_type}
+                        st.session_state.mcp_config = {"url": url, "transport_type": current_config["transport_type"]}
                         st.rerun()
 
                 except Exception as e:
