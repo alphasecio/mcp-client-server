@@ -8,7 +8,7 @@ from fastmcp.client.transports import SSETransport, StreamableHttpTransport
 # Patch asyncio to avoid "Event loop is closed" errors in Streamlit
 nest_asyncio.apply()
 
-# Initialise session state for connection config, tools and messages
+# Initialise session state for connection config, tools, messages and access token
 if "mcp_config" not in st.session_state:
     st.session_state.mcp_config = None
 
@@ -20,6 +20,12 @@ if "genai_client" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "access_token" not in st.session_state:
+    st.session_state.access_token = ""
+
+if "show_token_input" not in st.session_state:
+    st.session_state.show_token_input = False
 
 # Streamlit app configuration
 st.set_page_config(page_title="MCP Chatbot", page_icon="💬", initial_sidebar_state="auto")
@@ -56,18 +62,14 @@ def normalize_url(url: str, transport_type: str) -> str:
 
 def create_transport(config):
     if config["transport_type"] == "sse":
-        return SSETransport(config["url"])
+        return SSETransport(config["url"], auth=st.session_state.access_token if st.session_state.access_token else None)
     else:
-        return StreamableHttpTransport(config["url"])
+        return StreamableHttpTransport(config["url"], auth=st.session_state.access_token if st.session_state.access_token else None)
 
 async def init_client_and_get_tools(transport):
-    try:
-        async with Client(transport) as client:
-            tools = await client.list_tools()
-            return tools
-    except Exception as e:
-        st.error(f"Connection failed: {e}")
-        return None
+    async with Client(transport) as client:
+        tools = await client.list_tools()
+        return tools
 
 async def generate_response(prompt, mcp_config):
     if mcp_config:
@@ -140,13 +142,25 @@ with st.sidebar:
         
         current_config = {"url": server_url.strip(), "transport_type": transport_type}
         
+        if st.session_state.show_token_input:
+            token = st.text_input("Access Token", type="password", help="Paste your access token here.")
+            if token:
+                st.session_state.access_token = token
+                st.session_state.show_token_input = False
+                st.rerun()
+
         col1, col2 = st.columns(2)
         with col1:
             connect = st.button(label="Connect")
         with col2:
             disconnect = st.button(label="Disconnect")
+
+        if st.session_state.get("last_connect_error") == "unauthorized":
+            st.warning("❌ Unauthorized (401). Please provide a valid access token.")
+            st.session_state.last_connect_error = None
         
         if disconnect:
+            st.session_state.show_token_input = False
             st.session_state.mcp_config = None
             st.session_state.mcp_tools = []
             st.rerun()
@@ -157,16 +171,22 @@ with st.sidebar:
             else:
                 try:
                     url = normalize_url(current_config["url"], current_config["transport_type"])
-                    transport = SSETransport(url) if current_config["transport_type"] == "sse" else StreamableHttpTransport(url)
+                    st.session_state.mcp_config = {"url": url, "transport_type": current_config["transport_type"]}
+                    transport = create_transport(st.session_state.mcp_config)
                     tools = asyncio.run(init_client_and_get_tools(transport))
 
                     if tools is not None:
                         st.session_state.mcp_tools = tools
-                        st.session_state.mcp_config = {"url": url, "transport_type": current_config["transport_type"]}
+                        st.session_state.show_token_input = False
                         st.rerun()
 
                 except Exception as e:
-                    st.error(f"Connection error: {e}")
+                    if 401 or "401" in str(e):
+                        st.session_state.show_token_input = True
+                        st.session_state.last_connect_error = "unauthorized"
+                        st.rerun()
+                    else:
+                        st.error(f"Connection error: {e}")
                     st.session_state.mcp_config = None
                     st.session_state.mcp_tools = []
     
