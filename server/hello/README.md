@@ -17,4 +17,4 @@ A minimal [FastMCP](https://github.com/jlowin/fastmcp) server with two sample to
 
 ## 🔐 Authentication / Authorization
 
-Not implemented in this MCP server. See FastMCP [server authentication](https://gofastmcp.com/servers/auth/bearer) for details, and hello-auth for a sample server.
+Not implemented in this MCP server. See FastMCP [server authentication](https://gofastmcp.com/servers/auth/bearer) for details, and [hello-auth](https://github.com/alphasecio/mcp-client-server/tree/main/server/hello-auth) for a sample server.
