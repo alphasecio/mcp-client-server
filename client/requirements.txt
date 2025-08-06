@@ -1,4 +1,4 @@
 streamlit==1.47.1
-google-genai==1.25.0
-fastmcp==2.10.5
+google-genai==1.28.0
+fastmcp==2.11.1
 nest-asyncio==1.6.0
