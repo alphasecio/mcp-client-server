@@ -11,19 +11,14 @@ nest_asyncio.apply()
 # Initialise session state for connection config, tools, messages and access token
 if "mcp_config" not in st.session_state:
     st.session_state.mcp_config = None
-
 if "mcp_tools" not in st.session_state:
     st.session_state.mcp_tools = []
-
 if "genai_client" not in st.session_state:
     st.session_state.genai_client = None
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "access_token" not in st.session_state:
     st.session_state.access_token = ""
-
 if "show_token_input" not in st.session_state:
     st.session_state.show_token_input = False
 
@@ -107,18 +102,19 @@ async def generate_response(prompt, mcp_config):
 with st.sidebar:
     st.title("💬 MCP Chatbot")
     st.subheader("⚙️ Settings")
-    with st.container(border=True):
-        if "GOOGLE_API_KEY" not in os.environ:
+    
+    if "GOOGLE_API_KEY" not in os.environ:
+        with st.container(border=True):
             google_api_key = st.text_input("Google API Key", type="password", help="Get your API key [here](https://aistudio.google.com/apikey).")
-        else:
-            google_api_key = os.environ.get("GOOGLE_API_KEY")
+    else:
+        google_api_key = os.environ.get("GOOGLE_API_KEY")
 
-        # Initialize Google GenAI client
-        if google_api_key and google_api_key.strip() and not st.session_state.genai_client:
-            try:
-                st.session_state.genai_client = genai.Client(api_key=google_api_key)
-            except Exception as e:
-                st.error(f"Failed to initialise Gemini client: {e}")
+    # Initialize Google GenAI client
+    if google_api_key and google_api_key.strip() and not st.session_state.genai_client:
+        try:
+            st.session_state.genai_client = genai.Client(api_key=google_api_key)
+        except Exception as e:
+            st.error(f"Failed to initialise Gemini client: {e}")
     
     with st.container(border=True):
         config = load_mcp_config()
