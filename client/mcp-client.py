@@ -10,7 +10,7 @@ nest_asyncio.apply()
 
 # Initialise session state for connection config, tools, messages and access token
 if "mcp_config" not in st.session_state:
-    st.session_state.mcp_config = None
+    st.session_state.mcp_config = {"url": "", "transport_type": "streamable-http"}
 if "mcp_tools" not in st.session_state:
     st.session_state.mcp_tools = []
 if "genai_client" not in st.session_state:
@@ -117,16 +117,20 @@ with st.sidebar:
 
         selected_key = st.selectbox("MCP Server", server_keys)
 
+        current_cfg = st.session_state.mcp_config or {}
+        default_url = current_cfg.get("url", "")
+        default_transport = current_cfg.get("transport_type", "streamable-http")
+    
         if selected_key != "custom":
             selected_server = config["mcpServers"][selected_key]
             server_url = st.text_input("MCP Server URL", value=selected_server["url"], disabled=True)
         else:
-            default_url = st.session_state.mcp_config["url"] if st.session_state.mcp_config else ""
-            default_transport = st.session_state.mcp_config["transport_type"] if st.session_state.mcp_config else "streamable-http"
-
-            server_url = st.text_input("MCP Server URL", default_url)
+            server_url = st.text_input("MCP Server URL", value=default_url, placeholder="https://example.com/mcp/")
         
-        current_config = {"url": server_url.strip()}
+        current_config = {
+            "url": server_url.strip(),
+            "transport_type": default_transport
+        }
         
         if st.session_state.show_token_input:
             token = st.text_input("Access Token", type="password", help="Paste your access token here.")
@@ -149,6 +153,7 @@ with st.sidebar:
             st.session_state.show_token_input = False
             st.session_state.mcp_config = None
             st.session_state.mcp_tools = []
+            st.session_state.access_token = ""
             st.rerun()
 
         if connect:
@@ -157,15 +162,19 @@ with st.sidebar:
             else:
                 try:
                     url = normalize_url(current_config["url"])
-                    st.session_state.mcp_config = {"url": url}
+                    st.session_state.mcp_config = {
+                        "url": url,
+                        "transport_type": "streamable-http"
+                    }
+    
                     transport = create_transport(st.session_state.mcp_config)
                     tools = asyncio.run(init_client_and_get_tools(transport))
-
+    
                     if tools is not None:
                         st.session_state.mcp_tools = tools
                         st.session_state.show_token_input = False
                         st.rerun()
-
+    
                 except Exception as e:
                     if "401" in str(e):
                         st.session_state.show_token_input = True
@@ -173,8 +182,8 @@ with st.sidebar:
                         st.rerun()
                     else:
                         st.error(f"Connection error: {e}")
-                    st.session_state.mcp_config = None
-                    st.session_state.mcp_tools = []
+                        st.session_state.mcp_config = None
+                        st.session_state.mcp_tools = []
     
     # Display available tools once connected
     if st.session_state.mcp_tools:
