@@ -3,7 +3,7 @@ import streamlit as st
 import google.genai as genai
 
 from fastmcp import Client
-from fastmcp.client.transports import SSETransport, StreamableHttpTransport
+from fastmcp.client.transports import StreamableHttpTransport
 
 # Patch asyncio to avoid "Event loop is closed" errors in Streamlit
 nest_asyncio.apply()
@@ -25,41 +25,36 @@ if "show_token_input" not in st.session_state:
 # Streamlit app configuration
 st.set_page_config(page_title="MCP Chatbot", page_icon="💬", initial_sidebar_state="auto")
 
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-2.5-flash"
 
 # Helper functions
 def load_mcp_config():
     try:
         return json.loads(os.environ.get("MCP_SERVER_CONFIG", '{"mcpServers":{}}'))
-    except Exception as e:
-        st.warning("Missing or invalid MCP config.")
+    except Exception:
         return {"mcpServers": {}}
 
-def normalize_url(url: str, transport_type: str) -> str:
-    # Validate that the URL starts with http or https
+def normalize_url(url: str) -> str:
+    """Ensure the MCP HTTP server URL is valid and normalized."""
+    url = url.strip()
+    if not url:
+        return ""
+
     if not url.startswith(("http://", "https://")):
-        st.error("URL must start with http:// or https://")
-        st.stop()
+        url = "https://" + url
 
-    # Normalize trailing slashes for consistent checks
     url = url.rstrip("/")
-
-    # Modify URL based on transport type
-    if transport_type == "sse":
-        if not url.endswith("/sse"):
-            url += "/sse"
-    elif transport_type == "streamable-http":
-        if not (url.endswith("/mcp") or url.endswith("/mcp/")):
-            url += "/mcp/"
-        elif url.endswith("/mcp"):
-            url += "/"
+    if not (url.endswith("/mcp") or url.endswith("/mcp/")):
+        url += "/mcp/"
+    elif url.endswith("/mcp"):
+        url += "/"
     return url
 
 def create_transport(config):
-    if config["transport_type"] == "sse":
-        return SSETransport(config["url"], auth=st.session_state.access_token if st.session_state.access_token else None)
-    else:
-        return StreamableHttpTransport(config["url"], auth=st.session_state.access_token if st.session_state.access_token else None)
+    return StreamableHttpTransport(
+        config["url"], 
+        auth=st.session_state.access_token or None
+    )
 
 async def init_client_and_get_tools(transport):
     async with Client(transport) as client:
@@ -125,18 +120,13 @@ with st.sidebar:
         if selected_key != "custom":
             selected_server = config["mcpServers"][selected_key]
             server_url = st.text_input("MCP Server URL", value=selected_server["url"], disabled=True)
-            transport_type = st.selectbox("MCP Transport", ("streamable-http", "sse"),
-                                        index=0 if selected_server["transport"].lower() == "streamable-http" else 1,
-                                        disabled=True)
         else:
             default_url = st.session_state.mcp_config["url"] if st.session_state.mcp_config else ""
             default_transport = st.session_state.mcp_config["transport_type"] if st.session_state.mcp_config else "streamable-http"
 
             server_url = st.text_input("MCP Server URL", default_url)
-            transport_type = st.selectbox("MCP Transport", ("streamable-http", "sse"),
-                                        index=0 if default_transport == "streamable-http" else 1)
         
-        current_config = {"url": server_url.strip(), "transport_type": transport_type}
+        current_config = {"url": server_url.strip()}
         
         if st.session_state.show_token_input:
             token = st.text_input("Access Token", type="password", help="Paste your access token here.")
@@ -166,8 +156,8 @@ with st.sidebar:
                 st.error("Provide MCP Server URL.")
             else:
                 try:
-                    url = normalize_url(current_config["url"], current_config["transport_type"])
-                    st.session_state.mcp_config = {"url": url, "transport_type": current_config["transport_type"]}
+                    url = normalize_url(current_config["url"])
+                    st.session_state.mcp_config = {"url": url}
                     transport = create_transport(st.session_state.mcp_config)
                     tools = asyncio.run(init_client_and_get_tools(transport))
 
@@ -177,7 +167,7 @@ with st.sidebar:
                         st.rerun()
 
                 except Exception as e:
-                    if 401 or "401" in str(e):
+                    if "401" in str(e):
                         st.session_state.show_token_input = True
                         st.session_state.last_connect_error = "unauthorized"
                         st.rerun()
