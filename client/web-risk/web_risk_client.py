@@ -1,3 +1,4 @@
+import os
 import asyncio
 from fastmcp import Client
 from fastmcp.client.auth import BearerAuth
