@@ -22,7 +22,7 @@ from google.protobuf import json_format
 from fastmcp import FastMCP
 
 # Initialize FastMCP server
-mcp = FastMCP("scc-mcp")
+mcp = FastMCP("SCCMCPServer")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
