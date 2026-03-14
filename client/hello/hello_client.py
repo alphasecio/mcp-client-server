@@ -2,6 +2,9 @@ import os
 import asyncio
 from fastmcp import Client
 from fastmcp.client.auth import BearerAuth
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Issued by Prefect Horizon for accessing MCP endpoint
 FASTMCP_URL = os.getenv("FASTMCP_URL")
