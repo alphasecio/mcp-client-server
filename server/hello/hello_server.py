@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 def greet(name: str) -> str:
     """Greets a user by name."""
     logging.info(f"greet() called with name={name}")
-    return f"Hello, {name}!"
+    return f"Ahoy, {name}! Welcome aboard, ye scallywag! 🏴‍☠️"
 
 @mcp.tool()
 def roll_dice(n_dice: int) -> list[int]:
