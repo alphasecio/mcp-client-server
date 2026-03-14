@@ -69,7 +69,7 @@ def lookup_url(url: str) -> Dict[str, Any]:
             return {
                 "safe": True,
                 "url": url,
-                "message": f"No threats detection"
+                "message": f"No threats detected"
             }
             
     except Exception as e:
