@@ -1,5 +1,5 @@
 # Stage 1 - Build
-FROM cgr.dev/chainguard/python:latest-dev AS builder
+FROM cgr.dev/chainguard/python:3.12-dev AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN . venv/bin/activate && uv pip install --no-cache-dir -r requirements.txt
 
 # Stage 2 - Run
-FROM cgr.dev/chainguard/python:latest
+FROM cgr.dev/chainguard/python:3.12
 
 WORKDIR /app
 
