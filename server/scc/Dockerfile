@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=build /python-deps /python-deps
 COPY --from=build /app /app
 
-ENV PYTHONPATH="/python-deps/lib/python3.11/site-packages"
+ENV PYTHONPATH="/python-deps/lib/python3.12/site-packages"
 
 EXPOSE 8080
 
