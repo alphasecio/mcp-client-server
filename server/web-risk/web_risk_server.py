@@ -7,7 +7,7 @@ from google.cloud import webrisk_v1
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-mcp_server = FastMCP(name="WebRiskMCPServer")
+mcp = FastMCP(name="WebRiskMCPServer")
 
 project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
 if not project_id:
@@ -27,7 +27,7 @@ def _get_client():
             raise
     return _client
 
-@mcp_server.tool()
+@mcp.tool()
 def lookup_url(url: str) -> Dict[str, Any]:
     """Lookup a URL using Google Cloud Web Risk API and check for threats."""
     logger.info(f"lookup_url() called with url={url}")
@@ -84,7 +84,7 @@ async def main():
   port = int(os.environ.get("PORT", 8000))
   logger.info(f"Starting Web Risk MCP Server on port {port}...")  
   
-  await mcp_server.run_async(transport="streamable-http", path="/mcp", host="0.0.0.0", port=port)
+  await mcp.run_async(transport="streamable-http", path="/mcp", host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     asyncio.run(main())
