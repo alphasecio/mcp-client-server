@@ -10,7 +10,7 @@ nest_asyncio.apply()
 
 # Initialise session state for connection config, tools, messages and access token
 if "mcp_config" not in st.session_state:
-    st.session_state.mcp_config = {"url": "", "transport_type": "streamable-http"}
+    st.session_state.mcp_config = None
 if "mcp_tools" not in st.session_state:
     st.session_state.mcp_tools = []
 if "genai_client" not in st.session_state:
@@ -19,8 +19,10 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "access_token" not in st.session_state:
     st.session_state.access_token = ""
-if "show_token_input" not in st.session_state:
-    st.session_state.show_token_input = False
+if "connection_error" not in st.session_state:
+    st.session_state.connection_error = None
+if "is_connected" not in st.session_state:
+    st.session_state.is_connected = False
 
 # Streamlit app configuration
 st.set_page_config(page_title="MCP Chatbot", page_icon="💬", initial_sidebar_state="auto")
@@ -50,21 +52,33 @@ def normalize_url(url: str) -> str:
         url += "/"
     return url
 
-def create_transport(config):
-    return StreamableHttpTransport(
-        config["url"], 
-        auth=st.session_state.access_token or None
-    )
+def create_transport(config, token=None):
+    """Create transport with optional token."""
+    auth_token = token if token else None
+    return StreamableHttpTransport(config["url"], auth=auth_token)
 
-async def init_client_and_get_tools(transport):
-    async with Client(transport) as client:
-        tools = await client.list_tools()
-        return tools
+async def test_connection_and_get_tools(transport):
+    """Test connection and retrieve tools. Returns (tools, error)."""
+    try:
+        async with Client(transport) as client:
+            tools = await client.list_tools()
+            return tools, None
+    except Exception as e:
+        error_msg = str(e)
+        # Check for common auth errors
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            return None, "unauthorized"
+        elif "403" in error_msg or "Forbidden" in error_msg:
+            return None, "forbidden"
+        elif "404" in error_msg or "Not Found" in error_msg:
+            return None, "not_found"
+        else:
+            return None, error_msg
 
 async def generate_response(prompt, mcp_config):
-    if mcp_config:
+    if mcp_config and st.session_state.is_connected:
         try:
-            transport = create_transport(mcp_config)
+            transport = create_transport(mcp_config, st.session_state.access_token)
             async with Client(transport) as client:
                 tools = [client.session]
                 response = await st.session_state.genai_client.aio.models.generate_content(
@@ -98,6 +112,7 @@ with st.sidebar:
     st.title("💬 MCP Chatbot")
     st.subheader("⚙️ Settings")
     
+    # Google API Key
     if "GOOGLE_API_KEY" not in os.environ:
         with st.container(border=True):
             google_api_key = st.text_input("Google API Key", type="password", help="Get your API key [here](https://aistudio.google.com/apikey).")
@@ -111,15 +126,14 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Failed to initialise Gemini client: {e}")
     
+    # MCP Server Configuration
     with st.container(border=True):
         config = load_mcp_config()
         server_keys = list(config["mcpServers"].keys()) + ["custom"]
 
         selected_key = st.selectbox("MCP Server", server_keys)
 
-        current_cfg = st.session_state.mcp_config or {}
-        default_url = current_cfg.get("url", "")
-        default_transport = current_cfg.get("transport_type", "streamable-http")
+        default_url = st.session_state.mcp_config.get("url", "") if st.session_state.mcp_config else ""
     
         if selected_key != "custom":
             selected_server = config["mcpServers"][selected_key]
@@ -127,79 +141,99 @@ with st.sidebar:
         else:
             server_url = st.text_input("MCP Server URL", value=default_url, placeholder="https://example.com/mcp/")
         
-        current_config = {
-            "url": server_url.strip(),
-            "transport_type": default_transport
-        }
+        # Access Token Input (always visible, but optional)
+        token_value = st.text_input(
+            "API Key / Access Token (optional)", 
+            type="password",
+            value=st.session_state.access_token,
+            help="Required for protected MCP servers. Leave blank for public servers.",
+            key="token_input"
+        )
         
-        if st.session_state.show_token_input:
-            token = st.text_input("Access Token", type="password", help="Paste your access token here.")
-            if token:
-                st.session_state.access_token = token
-                st.session_state.show_token_input = False
-                st.rerun()
+        # Update token in session state when changed
+        if token_value != st.session_state.access_token:
+            st.session_state.access_token = token_value
+        
+        # Connection status indicator
+        if st.session_state.is_connected:
+            st.success(f"✅ Connected to MCP server.")
+        
+        # Display connection errors
+        if st.session_state.connection_error:
+            if st.session_state.connection_error == "unauthorized":
+                st.error("❌ **401 Unauthorized**: Please provide a valid API key or access token.")
+            elif st.session_state.connection_error == "forbidden":
+                st.error("❌ **403 Forbidden**: Access token is valid but lacks permissions.")
+            elif st.session_state.connection_error == "not_found":
+                st.error("❌ **404 Not Found**: MCP server endpoint not found. Check the URL.")
+            else:
+                st.error(f"❌ Connection error: {st.session_state.connection_error}")
 
+        # Connect/Disconnect buttons
         col1, col2 = st.columns(2)
         with col1:
-            connect = st.button(label="Connect")
+            connect = st.button(label="Connect", disabled=st.session_state.is_connected)
         with col2:
-            disconnect = st.button(label="Disconnect")
-
-        if st.session_state.get("last_connect_error") == "unauthorized":
-            st.warning("❌ Unauthorized (401). Please provide a valid access token.")
-            st.session_state.last_connect_error = None
+            disconnect = st.button(label="Disconnect", disabled=not st.session_state.is_connected)
         
         if disconnect:
-            st.session_state.show_token_input = False
-            st.session_state.mcp_config = None
+            st.session_state.is_connected = False
             st.session_state.mcp_tools = []
             st.session_state.access_token = ""
+            st.session_state.connection_error = None
             st.rerun()
 
         if connect:
             if not server_url.strip():
-                st.error("Provide MCP Server URL.")
+                st.session_state.connection_error = "MCP Server URL cannot be empty."
             else:
                 try:
-                    url = normalize_url(current_config["url"])
-                    st.session_state.mcp_config = {
+                    url = normalize_url(server_url)
+                    test_config = {
                         "url": url,
                         "transport_type": "streamable-http"
                     }
     
-                    transport = create_transport(st.session_state.mcp_config)
-                    tools = asyncio.run(init_client_and_get_tools(transport))
+                    # Test connection with current token
+                    transport = create_transport(test_config, st.session_state.access_token)
+                    tools, error = asyncio.run(test_connection_and_get_tools(transport))
     
-                    if tools is not None:
+                    if error:
+                        # Connection failed
+                        st.session_state.connection_error = error
+                        st.session_state.is_connected = False
+                        st.session_state.mcp_tools = []
+                        st.rerun()
+                    else:
+                        # Connection successful
+                        st.session_state.mcp_config = test_config
                         st.session_state.mcp_tools = tools
-                        st.session_state.show_token_input = False
+                        st.session_state.is_connected = True
+                        st.session_state.connection_error = None
                         st.rerun()
     
                 except Exception as e:
-                    if "401" in str(e):
-                        st.session_state.show_token_input = True
-                        st.session_state.last_connect_error = "unauthorized"
-                        st.rerun()
-                    else:
-                        st.error(f"Connection error: {e}")
-                        st.session_state.mcp_config = None
-                        st.session_state.mcp_tools = []
+                    st.session_state.connection_error = str(e)
+                    st.session_state.is_connected = False
+                    st.session_state.mcp_tools = []
     
     # Display available tools once connected
-    if st.session_state.mcp_tools:
+    if st.session_state.is_connected and st.session_state.mcp_tools:
         st.subheader("🛠️ Tools Available")
         for tool in st.session_state.mcp_tools:
             with st.expander(f"🔧 {tool.name}", expanded=False):
                 st.write(f"`{tool.description}`")
-                st.write("Input Schema:")                        
+                st.write("**Input Schema:**")                        
                 schema_props = tool.inputSchema.get("properties", {})
                 if schema_props:
                     for prop, details in schema_props.items():
                         type_str = details.get("type", "unknown")
-                        st.write(f"- `{prop}`: `{type_str}`")
+                        desc = details.get("description", "")
+                        required = "required" if prop in tool.inputSchema.get("required", []) else "optional"
+                        st.write(f"- `{prop}` ({type_str}, {required}): {desc}")
                 else:
                     st.write("_No input schema available._")
-    else:
+    elif not st.session_state.is_connected:
         st.info("🔌 Not connected to MCP server.")
 
 # Display chat history
@@ -223,7 +257,7 @@ if prompt := st.chat_input("Ask anything"):
         ERROR_MSG = "Sorry, I couldn't generate a response. Please try again."
         try:
             enhanced_prompt = prompt
-            if st.session_state.mcp_tools:
+            if st.session_state.is_connected and st.session_state.mcp_tools:
                 tool_names = [tool.name for tool in st.session_state.mcp_tools]
                 enhanced_prompt += f"\n\nAvailable tools on the MCP server: {', '.join(tool_names)}."
             
@@ -235,7 +269,7 @@ if prompt := st.chat_input("Ask anything"):
             else:
                 st.error(ERROR_MSG)
                 st.session_state.messages.append({"role": "assistant", "content": ERROR_MSG})
-
+ 
         except Exception as e:
             st.error(f"Exception: {e}")
             st.session_state.messages.append({"role": "assistant", "content": ERROR_MSG})
