@@ -8,8 +8,9 @@ from fastmcp import FastMCP
 mcp = FastMCP(name="HelloMCPServer")
 
 logging.basicConfig(level=logging.INFO)
-resend.api_key = os.getenv("RESEND_API_KEY")
-sender = os.getenv("RESEND_FROM_EMAIL")
+RESEND_API_KEY= os.getenv("RESEND_API_KEY")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL")
+resend.api_key = RESEND_API_KEY
 
 @mcp.tool()
 def greet(name: str) -> str:
@@ -27,9 +28,11 @@ def roll_dice(n_dice: int) -> list[int]:
 def send_email(recipient: str, subject: str, body: str) -> str:
     """Send an email using Resend."""
     logging.info(f"send_email() called recipient={recipient}")
+    if not RESEND_API_KEY or not RESEND_FROM_EMAIL:
+        return "Error: Missing Resend API key or sender email."
     try:
         email = resend.Emails.send({
-            "from": sender,
+            "from": RESEND_FROM_EMAIL,
             "to": [recipient],
             "subject": subject,
             "html": f"<strong>{body}</strong>",
