@@ -41,15 +41,11 @@ def normalize_url(url: str) -> str:
     url = url.strip()
     if not url:
         return ""
-
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
-
     url = url.rstrip("/")
-    if not (url.endswith("/mcp") or url.endswith("/mcp/")):
-        url += "/mcp/"
-    elif url.endswith("/mcp"):
-        url += "/"
+    if not url.endswith("/mcp"):
+        url += "/mcp"
     return url
 
 def create_transport(config, token=None):
